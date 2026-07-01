@@ -22,11 +22,10 @@ The goal of this project is to provide an affordable DIY alternative using readi
 ## Repository Contents
 
 ```
-Firmware/          Arduino source code
-BOM/               Complete Bill of Materials
-Board Files/       Required Arduino board definitions
-Wiring/            Wiring diagrams
-Documentation/     Installation and setup guides
+Firmware          Arduino source code
+BOM               Complete Bill of Materials
+Wiring            Wiring diagrams
+Documentation    Installation and setup guides
 ```
 
 ---
