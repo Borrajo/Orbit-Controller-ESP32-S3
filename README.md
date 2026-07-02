@@ -2,6 +2,8 @@
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
 ![Arduino](https://img.shields.io/badge/Arduino-Pro%20Micro-00979D?logo=arduino)
 ![Open Source](https://img.shields.io/badge/Open%20Source-Yes-brightgreen)
+[![GitHub stars](https://img.shields.io/github/stars/HackMan3D/HackMan3D-Orbit-Controller?style=social)](https://github.com/HackMan3D/HackMan3D-Orbit-Controller)
+
 # Hackman3D Orbit Controller
 
 <p align="center">
@@ -11,6 +13,8 @@
 An open-source DIY 6-DOF navigation controller built with an Arduino Pro Micro and Hall Effect joysticks.
 
 This repository contains everything needed to build your own controller, including the firmware, Bill of Materials, wiring diagrams, board files, and documentation.
+
+> **This is my first large open-source hardware project after nearly four months of development. I've been using this controller daily for the past two months and now consider it ready to share with the maker community. Documentation and tutorials will continue to improve thanks to your feedback.**
 
 ---
 
@@ -29,12 +33,12 @@ This repository contains everything needed to build your own controller, includi
 
 ## Repository Contents
 
-```
-Firmware          Arduino source code
-BOM               Complete Bill of Materials
-Wiring            Wiring diagrams
-Documentation    Installation and setup guides
-```
+| Folder | Description |
+|--------|-------------|
+| Firmware | Arduino source code |
+| BOM | Complete Bill of Materials |
+| Wiring | Wiring diagrams |
+| Documentation | Assembly and installation guides |
 
 ---
 
@@ -59,13 +63,31 @@ A complete list of components is available in the **BOM** folder.
 
 ---
 
+## Compatible Applications
+
+Works with most software supporting 3Dconnexion devices, including:
+
+- Fusion 360
+- Blender
+- SolidWorks
+- FreeCAD
+- Onshape
+- Autodesk Inventor
+- Rhino
+- Bambu Studio
+- Cura
+- PrusaSlicer
+- and many more.
+
+---
+
 ## Operating System Compatibility
 
-| Operating System | Status      |
-| ---------------- | ----------- |
-| Windows          | ✅ Supported |
-| macOS            | ✅ Supported |
-| Linux            | ✅ Supported |
+| Operating System | Status |
+|------------------|--------|
+| Windows | ✅ Supported |
+| macOS | ✅ Supported |
+| Linux | ✅ Supported |
 
 ---
 
@@ -77,6 +99,40 @@ A complete list of components is available in the **BOM** folder.
 4. Upload the firmware to the Arduino Pro Micro.
 5. Install the required driver.
 6. Enjoy your new DIY 3D navigation controller!
+
+---
+
+## STL Files
+
+The complete set of printable STL files is available on Creality Cloud:
+
+👉 **https://www.crealitycloud.com/model-detail/hackman3d-orbit-controller**
+
+If you enjoy the project, don't hesitate to leave a ❤️, download the files, and share your makes!
+
+---
+
+## Open Source Philosophy
+
+This project is intended to be built, modified and improved by the community.
+
+Feel free to fork it, adapt it to your needs, and share your own improvements.
+
+Every contribution helps make the project better.
+
+---
+
+## Roadmap
+
+- [x] Hardware design
+- [x] Firmware
+- [x] Complete documentation
+- [x] Windows support
+- [x] macOS support
+- [x] Linux support
+- [ ] Configuration utility
+- [ ] Additional button layouts
+- [ ] Community requested improvements
 
 ---
 
@@ -96,6 +152,14 @@ If you build your own controller or improve the project, feel free to share it w
 
 ---
 
+## Support
+
+If you have any questions, open an Issue or start a Discussion.
+
+Feedback is always appreciated and helps improve the project.
+
+---
+
 ## Disclaimer
 
 This is an independent open-source DIY project and is not affiliated with or endorsed by 3Dconnexion.
@@ -104,18 +168,24 @@ This is an independent open-source DIY project and is not affiliated with or end
 
 ## Credits
 
-Designed by **Hackman3D**
+Designed by **HackMan3D**
 
 This project is released free of charge for the maker community.
 
-Credits
+### Special Thanks
 
-Special thanks to NavCore for developing and maintaining the custom Arduino board package that enables native 3Dconnexion compatibility.
+Special thanks to **NavCore** for developing and maintaining the custom Arduino board package that enables native 3Dconnexion compatibility on the Arduino Pro Micro.
 
-This project uses NavCore's board package. If you'd like to learn more or support their work, please visit:
+Board package:
 
 https://github.com/NavCoree/3D-controller-Board-package
 
 Without this work, native 3Dconnexion support on the Arduino Pro Micro would not have been possible.
 
-If you like this project, don't forget to ⭐ star the repository!
+---
+
+If you build one, I'd genuinely love to see it.
+
+Don't hesitate to share your photos, remixes or improvements with the community!
+
+⭐ If you like this project, consider starring this repository.
