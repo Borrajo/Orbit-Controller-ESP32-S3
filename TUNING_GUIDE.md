@@ -1,6 +1,6 @@
 # Hackman3D Orbit Controller - Tuning Guide
 
-This guide explains how to adjust the **dead zones**, **sensitivity**, and **reactivity** of the Hackman3D Orbit Controller if your controller feels too sensitive, too slow, unstable, or if it produces unwanted movements.
+This guide explains how to adjust the **dead zones**, **speed**, **sensitivity**, and **reactivity** of the Hackman3D Orbit Controller if your controller feels too sensitive, too slow, unstable, or if it produces unwanted movements.
 
 All settings are located near the top of the firmware file:
 
@@ -20,8 +20,37 @@ const float GAIN_RX = 1.8;
 const float GAIN_RY = 1.8;
 const float GAIN_RZ = 2.0;
 
+const float MAX_SPEED_SCALE = 0.70;
+const float RESPONSE_CURVE = 1.6;
+
+const int SPEED_MODE_COUNT = 3;
+const int DEFAULT_SPEED_MODE = 1;
+const float SPEED_MODE_SCALE[SPEED_MODE_COUNT] = {
+  0.50,
+  MAX_SPEED_SCALE,
+  1.00
+};
+const float SPEED_MODE_RESPONSE_CURVE[SPEED_MODE_COUNT] = {
+  1.9,
+  RESPONSE_CURVE,
+  1.3
+};
+
+const bool DEBUG_SERIAL = false;
+const unsigned long DEBUG_SERIAL_BAUD = 115200;
+const unsigned long DEBUG_SERIAL_INTERVAL_MS = 100;
+
 const float ROTATION_PRIORITY = 0.65;
 const bool ENABLE_DOMINANT_AXIS_FILTER = false;
+
+// PIN CONFIGURATION / CONFIGURATION DES PINS
+const int buttonPins[3] = { 2, 3, 7 };
+const int BUTTON_COUNT = 3;
+const int MODE_SWITCH_BUTTONS[BUTTON_COUNT] = { 0, 1, 2 };
+const int MODE_SWITCH_BUTTON_COUNT = 3;
+const bool MODE_SWITCH_SUPPRESS_BUTTONS = true;
+const unsigned long MODE_SWITCH_CHORD_WINDOW_MS = 250;
+const unsigned long MODE_SWITCH_DEBOUNCE_MS = 500;
 ```
 
 After changing a value, upload the firmware again with Arduino IDE and test the controller in your 3D/CAD software.
@@ -183,7 +212,232 @@ const int SMOOTH_DIVISOR = 7;
 
 ---
 
-## 5. Translation sensitivity
+## 5. Speed scale / response curve
+
+```cpp
+const float MAX_SPEED_SCALE = 0.70;
+const float RESPONSE_CURVE = 1.6;
+```
+
+These values control the global speed and the response curve of the controller.
+
+`MAX_SPEED_SCALE` limits the maximum speed of all axes.
+`RESPONSE_CURVE` changes how progressively the controller reacts near the center.
+
+A lower `MAX_SPEED_SCALE` makes the controller slower.
+A higher `RESPONSE_CURVE` makes small movements softer and more precise.
+
+### Decrease the speed scale if:
+
+- all axes feel too fast;
+- the camera moves too quickly;
+- maximum speed is too high.
+
+### Increase the speed scale if:
+
+- all axes feel too slow;
+- maximum speed is too low;
+- you need to push too far to reach full speed.
+
+### Increase the response curve if:
+
+- small movements are too sensitive;
+- the controller feels too nervous near the center;
+- you want more gradual acceleration.
+
+### Decrease the response curve if:
+
+- movement starts too slowly;
+- the controller feels too soft or delayed.
+
+### Recommended ranges
+
+```cpp
+MAX_SPEED_SCALE = 0.50 to 1.00
+RESPONSE_CURVE  = 1.0 to 2.2
+```
+
+### Examples
+
+Default slower profile:
+
+```cpp
+const float MAX_SPEED_SCALE = 0.70;
+const float RESPONSE_CURVE = 1.6;
+```
+
+Lower maximum speed:
+
+```cpp
+const float MAX_SPEED_SCALE = 0.50;
+const float RESPONSE_CURVE = 1.6;
+```
+
+Softer start near the center:
+
+```cpp
+const float MAX_SPEED_SCALE = 0.70;
+const float RESPONSE_CURVE = 1.9;
+```
+
+More direct response:
+
+```cpp
+const float MAX_SPEED_SCALE = 0.70;
+const float RESPONSE_CURVE = 1.0;
+```
+
+Adjust these values before changing individual axis gains.
+
+---
+
+## 6. Speed modes / button shortcut
+
+```cpp
+const int SPEED_MODE_COUNT = 3;
+const int DEFAULT_SPEED_MODE = 1;
+
+const float SPEED_MODE_SCALE[SPEED_MODE_COUNT] = {
+  0.50,
+  MAX_SPEED_SCALE,
+  1.00
+};
+
+const float SPEED_MODE_RESPONSE_CURVE[SPEED_MODE_COUNT] = {
+  1.9,
+  RESPONSE_CURVE,
+  1.3
+};
+```
+
+Speed modes let the controller switch between slow, normal, and fast profiles without changing the firmware every time.
+
+Default mode `1` is the normal profile.
+By default, pressing all three buttons at the same time changes the speed mode.
+
+The default button shortcut cycles through:
+
+1. slow;
+2. normal;
+3. fast.
+
+### Default profiles
+
+```cpp
+slow   = 50% speed, softer start
+normal = 70% speed, balanced start
+fast   = 100% speed, more direct start
+```
+
+### Change the startup mode if:
+
+- you always want the controller to start slower;
+- you always want the controller to start faster;
+- you do not want to use the button shortcut during normal use.
+
+### Example
+
+Start in slow mode:
+
+```cpp
+const int DEFAULT_SPEED_MODE = 0;
+```
+
+Start in fast mode:
+
+```cpp
+const int DEFAULT_SPEED_MODE = 2;
+```
+
+### Button shortcut
+
+```cpp
+const int MODE_SWITCH_BUTTONS[BUTTON_COUNT] = { 0, 1, 2 };
+const int MODE_SWITCH_BUTTON_COUNT = 3;
+const bool MODE_SWITCH_SUPPRESS_BUTTONS = true;
+const unsigned long MODE_SWITCH_CHORD_WINDOW_MS = 250;
+const unsigned long MODE_SWITCH_DEBOUNCE_MS = 500;
+```
+
+The default shortcut uses all three buttons at the same time.
+
+Button indexes start from `0`, so the three default buttons are:
+
+```cpp
+0, 1, 2
+```
+
+`MODE_SWITCH_BUTTON_COUNT` controls how many button indexes are used.
+
+### Examples
+
+Use only buttons 0 and 1 to switch speed mode:
+
+```cpp
+const int MODE_SWITCH_BUTTONS[BUTTON_COUNT] = { 0, 1, 2 };
+const int MODE_SWITCH_BUTTON_COUNT = 2;
+```
+
+Disable the speed mode shortcut:
+
+```cpp
+const int MODE_SWITCH_BUTTON_COUNT = 0;
+```
+
+If `MODE_SWITCH_SUPPRESS_BUTTONS` is `true`, the shortcut is not sent to the computer as normal button presses.
+
+`MODE_SWITCH_CHORD_WINDOW_MS` is the time allowed to complete the speed-mode button combo.
+This prevents CAD software from receiving one button while you are pressing the full combo.
+
+A quick single-button tap is sent as soon as the button is released.
+A held single button is sent after the chord window expires.
+A full combo switches speed mode only if all shortcut buttons are pressed within the chord window.
+
+Keep `MODE_SWITCH_CHORD_WINDOW_MS` around `150` to `400`.
+Lower it if held single buttons feel delayed.
+Increase it if your software still detects one button while switching speed mode.
+
+Keep `MODE_SWITCH_DEBOUNCE_MS` around `300` to `700` unless one press changes mode more than once.
+
+---
+
+## 7. Serial debug output
+
+```cpp
+const bool DEBUG_SERIAL = false;
+const unsigned long DEBUG_SERIAL_BAUD = 115200;
+const unsigned long DEBUG_SERIAL_INTERVAL_MS = 100;
+```
+
+Serial debug output prints the current speed mode, button mask, joystick values, and final HID output values.
+
+Keep this disabled during normal use.
+Enable it only when you need to check raw joystick movement, button states, or output values.
+
+### Enable debug output
+
+```cpp
+const bool DEBUG_SERIAL = true;
+```
+
+Then open the Arduino Serial Monitor or Serial Plotter at:
+
+```cpp
+115200 baud
+```
+
+### Increase the interval if:
+
+- the Serial Monitor prints too much data;
+- the controller feels slower while debugging.
+
+### Decrease the interval if:
+
+- you need faster feedback while testing joystick movement.
+
+---
+
+## 8. Translation sensitivity
 
 ```cpp
 const float GAIN_TX = 1.3;
@@ -231,7 +485,7 @@ const float GAIN_TX = 1.6;
 
 ---
 
-## 6. Rotation sensitivity
+## 9. Rotation sensitivity
 
 ```cpp
 const float GAIN_RX = 1.8;
@@ -280,7 +534,7 @@ const float GAIN_RY = 2.1;
 
 ---
 
-## 7. Rotation priority
+## 10. Rotation priority
 
 ```cpp
 const float ROTATION_PRIORITY = 0.65;
@@ -324,7 +578,7 @@ const float ROTATION_PRIORITY = 0.85;
 
 ---
 
-## 8. Dominant axis filter
+## 11. Dominant axis filter
 
 ```cpp
 const bool ENABLE_DOMINANT_AXIS_FILTER = false;
@@ -366,7 +620,7 @@ const bool ENABLE_DOMINANT_AXIS_FILTER = true;
 
 ---
 
-## 9. Center calibration samples
+## 12. Center calibration samples
 
 ```cpp
 const int CENTER_SAMPLES = 100;
@@ -402,7 +656,7 @@ const int CENTER_SAMPLES = 150;
 
 ---
 
-## 10. Common problems and suggested fixes
+## 13. Common problems and suggested fixes
 
 ### The controller moves by itself
 
@@ -422,6 +676,8 @@ Also make sure you do not touch the knob during USB connection.
 Try:
 
 ```cpp
+const float MAX_SPEED_SCALE = 0.85;
+const float RESPONSE_CURVE = 1.3;
 const int SMOOTH_DIVISOR = 3;
 ```
 
@@ -434,11 +690,87 @@ You can also slightly increase the gain values.
 Try:
 
 ```cpp
+const float MAX_SPEED_SCALE = 0.60;
+const float RESPONSE_CURVE = 1.8;
 const int SMOOTH_DIVISOR = 6;
 const int DEADZONE_INPUT = 50;
 ```
 
 You can also lower the gain of the axis that feels too strong.
+
+---
+
+### The maximum speed is too high
+
+Try:
+
+```cpp
+const float MAX_SPEED_SCALE = 0.60;
+```
+
+Use a lower value for a slower controller.
+
+---
+
+### Small movements are too fast
+
+Try:
+
+```cpp
+const float RESPONSE_CURVE = 1.8;
+```
+
+Use a higher value for more gradual acceleration from the center.
+
+---
+
+### A CAD app opens a menu while switching speed mode
+
+Try:
+
+```cpp
+const unsigned long MODE_SWITCH_CHORD_WINDOW_MS = 350;
+```
+
+Use a higher value if the software still receives one of the shortcut buttons before the full combo is detected.
+
+---
+
+### Single shortcut buttons feel delayed
+
+Try:
+
+```cpp
+const unsigned long MODE_SWITCH_CHORD_WINDOW_MS = 150;
+```
+
+Quick taps are sent when the button is released.
+Lower this value if held single-button shortcuts feel delayed.
+
+---
+
+### The speed mode changes more than once
+
+Try:
+
+```cpp
+const unsigned long MODE_SWITCH_DEBOUNCE_MS = 700;
+```
+
+Use a higher value if one shortcut press cycles through more than one speed mode.
+
+---
+
+### You need to check joystick or button values
+
+Try:
+
+```cpp
+const bool DEBUG_SERIAL = true;
+```
+
+Open the Arduino Serial Monitor or Serial Plotter at `115200 baud`.
+Set `DEBUG_SERIAL` back to `false` for normal use.
 
 ---
 
@@ -517,7 +849,7 @@ const float GAIN_RZ = 1.6;
 
 ---
 
-## 11. Recommended tuning method
+## 14. Recommended tuning method
 
 Change only one setting at a time.
 
@@ -526,9 +858,12 @@ Recommended order:
 1. Start with `DEADZONE_INPUT`.
 2. Adjust `DEADZONE_OUTPUT`.
 3. Adjust `SMOOTH_DIVISOR`.
-4. Adjust translation and rotation gains.
-5. Adjust `ENABLE_DOMINANT_AXIS_FILTER` if multi-axis movement feels blocked or too loose.
-6. Adjust `ROTATION_PRIORITY` only if rotation and translation are mixed.
+4. Adjust `MAX_SPEED_SCALE`.
+5. Adjust `RESPONSE_CURVE`.
+6. Adjust `SPEED_MODE_SCALE` and `SPEED_MODE_RESPONSE_CURVE` if you use speed modes.
+7. Adjust `ENABLE_DOMINANT_AXIS_FILTER` if multi-axis movement feels blocked or too loose.
+8. Adjust translation and rotation gains only if one axis needs correction.
+9. Adjust `ROTATION_PRIORITY` only if rotation and translation are mixed.
 
 After each change:
 
@@ -540,7 +875,7 @@ After each change:
 
 ---
 
-## 12. Safe default values
+## 15. Safe default values
 
 If tuning goes wrong, you can return to these default values:
 
@@ -558,13 +893,41 @@ const float GAIN_RX = 1.8;
 const float GAIN_RY = 1.8;
 const float GAIN_RZ = 2.0;
 
+const float MAX_SPEED_SCALE = 0.70;
+const float RESPONSE_CURVE = 1.6;
+
+const int SPEED_MODE_COUNT = 3;
+const int DEFAULT_SPEED_MODE = 1;
+const float SPEED_MODE_SCALE[SPEED_MODE_COUNT] = {
+  0.50,
+  MAX_SPEED_SCALE,
+  1.00
+};
+const float SPEED_MODE_RESPONSE_CURVE[SPEED_MODE_COUNT] = {
+  1.9,
+  RESPONSE_CURVE,
+  1.3
+};
+
+const bool DEBUG_SERIAL = false;
+const unsigned long DEBUG_SERIAL_BAUD = 115200;
+const unsigned long DEBUG_SERIAL_INTERVAL_MS = 100;
+
 const float ROTATION_PRIORITY = 0.65;
 const bool ENABLE_DOMINANT_AXIS_FILTER = false;
+
+const int buttonPins[3] = { 2, 3, 7 };
+const int BUTTON_COUNT = 3;
+const int MODE_SWITCH_BUTTONS[BUTTON_COUNT] = { 0, 1, 2 };
+const int MODE_SWITCH_BUTTON_COUNT = 3;
+const bool MODE_SWITCH_SUPPRESS_BUTTONS = true;
+const unsigned long MODE_SWITCH_CHORD_WINDOW_MS = 250;
+const unsigned long MODE_SWITCH_DEBOUNCE_MS = 500;
 ```
 
 ---
 
-## 13. Final note
+## 16. Final note
 
 Small hardware differences, joystick tolerances, soldering, wire routing, and printed part tolerances can affect the final feel of the controller.
 
