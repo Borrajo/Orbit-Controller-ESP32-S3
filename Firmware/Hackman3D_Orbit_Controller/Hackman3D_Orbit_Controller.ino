@@ -1,4 +1,5 @@
 #include "HID.h"
+#include <math.h>
 
 // ============================================================================
 // Hackman3D DIY SpaceMouse Firmware
@@ -48,6 +49,35 @@ const float GAIN_RX = 1.8;
 const float GAIN_RY = 1.8;
 const float GAIN_RZ = 2.0;
 
+// EN: Global maximum speed scale. 0.70 means 30% slower than the base firmware.
+// FR: Échelle globale de vitesse maximale. 0.70 signifie 30 % plus lent.
+const float MAX_SPEED_SCALE = 0.70;
+
+// EN: Response curve. 1.0 is linear; higher values make small movements slower.
+// FR: Courbe de réponse. 1.0 est linéaire ; plus haut adoucit les petits mouvements.
+const float RESPONSE_CURVE = 1.6;
+
+// EN: Speed profiles. Default mode 1 keeps the values above.
+// FR: Profils de vitesse. Le mode par défaut 1 garde les valeurs ci-dessus.
+const int SPEED_MODE_COUNT = 3;
+const int DEFAULT_SPEED_MODE = 1;
+const float SPEED_MODE_SCALE[SPEED_MODE_COUNT] = {
+  0.50,
+  MAX_SPEED_SCALE,
+  1.00
+};
+const float SPEED_MODE_RESPONSE_CURVE[SPEED_MODE_COUNT] = {
+  1.9,
+  RESPONSE_CURVE,
+  1.3
+};
+
+// EN: Serial debug output. Keep disabled during normal HID use.
+// FR: Sortie debug série. Garder désactivé pendant l’utilisation HID normale.
+const bool DEBUG_SERIAL = false;
+const unsigned long DEBUG_SERIAL_BAUD = 115200;
+const unsigned long DEBUG_SERIAL_INTERVAL_MS = 100;
+
 // EN: Lower value gives rotation more priority over translation.
 // FR: Plus la valeur est basse, plus la rotation est prioritaire.
 const float ROTATION_PRIORITY = 0.65;
@@ -85,6 +115,23 @@ const int pins[8] = {
 const int buttonPins[3] = { 2, 3, 7 };
 const int BUTTON_COUNT = 3;
 
+// EN: Button indexes used to switch speed mode. Default = all three buttons.
+// FR: Index des boutons utilisés pour changer de mode. Défaut = trois boutons.
+const int MODE_SWITCH_BUTTONS[BUTTON_COUNT] = { 0, 1, 2 };
+const int MODE_SWITCH_BUTTON_COUNT = 3;
+
+// EN: If true, the mode-switch button combo is not sent as normal HID buttons.
+// FR: Si vrai, la combinaison de changement de mode n’est pas envoyée en HID.
+const bool MODE_SWITCH_SUPPRESS_BUTTONS = true;
+
+// EN: Time to wait for the full combo before sending individual combo buttons.
+// FR: Temps d’attente de la combinaison avant d’envoyer les boutons séparés.
+const unsigned long MODE_SWITCH_CHORD_WINDOW_MS = 250;
+
+// EN: Minimum time between two speed mode changes.
+// FR: Temps minimum entre deux changements de mode de vitesse.
+const unsigned long MODE_SWITCH_DEBOUNCE_MS = 500;
+
 
 // ============================================================================
 // GLOBAL VARIABLES / VARIABLES GLOBALES
@@ -102,6 +149,18 @@ int16_t smoothTZ = 0;
 int16_t smoothRX = 0;
 int16_t smoothRY = 0;
 int16_t smoothRZ = 0;
+
+// EN: Current speed profile index.
+// FR: Index du profil de vitesse actuel.
+int currentSpeedMode = DEFAULT_SPEED_MODE;
+
+bool modeSwitchComboWasPressed = false;
+bool modeSwitchChordActive = false;
+bool modeSwitchChordComboTriggered = false;
+bool modeSwitchButtonsForwarded = false;
+uint32_t modeSwitchPendingButtons = 0;
+unsigned long modeSwitchChordStartedAt = 0;
+unsigned long lastModeSwitchAt = 0;
 
 
 // ============================================================================
@@ -287,7 +346,19 @@ int countNegative4(int a, int b, int c, int d, int threshold) {
 // ============================================================================
 
 int16_t smoothValue(int16_t current, int16_t target) {
-  return current + (target - current) / SMOOTH_DIVISOR;
+  int16_t delta = target - current;
+
+  if (delta == 0) {
+    return current;
+  }
+
+  int16_t step = delta / SMOOTH_DIVISOR;
+
+  if (step == 0) {
+    step = (delta > 0) ? 1 : -1;
+  }
+
+  return current + step;
 }
 
 
@@ -299,6 +370,83 @@ int16_t smoothValue(int16_t current, int16_t target) {
 
 int16_t applyGain(int16_t value, float gain) {
   return (int16_t)(value * gain);
+}
+
+
+// ============================================================================
+// applyResponseCurve()
+// EN: Scales maximum speed and makes small movements easier to control.
+// FR: Réduit la vitesse maximale et rend les petits mouvements plus contrôlables.
+// ============================================================================
+
+int16_t applyResponseCurve(int16_t value, float inputMax,
+                           float speedScale, float responseCurve) {
+  if (value == 0) {
+    return 0;
+  }
+
+  float magnitude = abs(value);
+  float maxMagnitude = inputMax;
+
+  if (maxMagnitude < DEADZONE_OUTPUT + 1.0) {
+    maxMagnitude = DEADZONE_OUTPUT + 1.0;
+  }
+
+  if (magnitude < DEADZONE_OUTPUT) {
+    return 0;
+  }
+
+  if (magnitude > maxMagnitude) {
+    magnitude = maxMagnitude;
+  }
+
+  float normalized = (magnitude - DEADZONE_OUTPUT) / (maxMagnitude - DEADZONE_OUTPUT);
+  float maxOutputMagnitude = maxMagnitude * speedScale;
+
+  if (maxOutputMagnitude < DEADZONE_OUTPUT) {
+    maxOutputMagnitude = DEADZONE_OUTPUT;
+  }
+
+  float curved = DEADZONE_OUTPUT +
+                  pow(normalized, responseCurve) *
+                  (maxOutputMagnitude - DEADZONE_OUTPUT);
+
+  if (value < 0) {
+    curved = -curved;
+  }
+
+  return (int16_t)curved;
+}
+
+
+// ============================================================================
+// resetSmoothing()
+// EN: Clears smoothed axis memory after mode changes.
+// FR: Réinitialise le lissage après un changement de mode.
+// ============================================================================
+
+void resetSmoothing() {
+  smoothTX = 0;
+  smoothTY = 0;
+  smoothTZ = 0;
+
+  smoothRX = 0;
+  smoothRY = 0;
+  smoothRZ = 0;
+}
+
+
+// ============================================================================
+// resetModeSwitchChord()
+// EN: Clears temporary state used while detecting a speed-mode button chord.
+// FR: Réinitialise l’état temporaire de détection de la combinaison de boutons.
+// ============================================================================
+
+void resetModeSwitchChord() {
+  modeSwitchChordActive = false;
+  modeSwitchChordComboTriggered = false;
+  modeSwitchButtonsForwarded = false;
+  modeSwitchPendingButtons = 0;
 }
 
 
@@ -367,6 +515,165 @@ void sendCommand(int16_t rx, int16_t ry, int16_t rz,
 
 
 // ============================================================================
+// readButtonMask()
+// EN: Reads physical buttons into a bit mask.
+// FR: Lit les boutons physiques dans un masque de bits.
+// ============================================================================
+
+uint32_t readButtonMask() {
+  uint32_t buttons = 0;
+
+  for (int i = 0; i < BUTTON_COUNT; i++) {
+    if (digitalRead(buttonPins[i]) == LOW) {
+      buttons |= (1UL << i);
+    }
+  }
+
+  return buttons;
+}
+
+
+// ============================================================================
+// getModeSwitchButtonMask()
+// EN: Builds a bit mask from the configured mode-switch buttons.
+// FR: Crée un masque à partir des boutons configurés pour changer de mode.
+// ============================================================================
+
+uint32_t getModeSwitchButtonMask() {
+  if (MODE_SWITCH_BUTTON_COUNT <= 0 || MODE_SWITCH_BUTTON_COUNT > BUTTON_COUNT) {
+    return 0;
+  }
+
+  uint32_t comboMask = 0;
+
+  for (int i = 0; i < MODE_SWITCH_BUTTON_COUNT; i++) {
+    int buttonIndex = MODE_SWITCH_BUTTONS[i];
+
+    if (buttonIndex < 0 || buttonIndex >= BUTTON_COUNT) {
+      return 0;
+    }
+
+    comboMask |= (1UL << buttonIndex);
+  }
+
+  return comboMask;
+}
+
+
+// ============================================================================
+// isModeSwitchComboPressed()
+// EN: Checks if the configured speed mode button combo is pressed.
+// FR: Vérifie si la combinaison de changement de mode est appuyée.
+// ============================================================================
+
+bool isModeSwitchComboPressed(uint32_t buttonMask) {
+  uint32_t comboMask = getModeSwitchButtonMask();
+
+  if (comboMask == 0) {
+    return false;
+  }
+
+  return (buttonMask & comboMask) == comboMask;
+}
+
+
+// ============================================================================
+// updateSpeedMode()
+// EN: Cycles through slow / normal / fast speed profiles.
+// FR: Change de profil lent / normal / rapide.
+// ============================================================================
+
+void updateSpeedMode(bool comboPressed) {
+  unsigned long now = millis();
+
+  if (comboPressed &&
+      !modeSwitchComboWasPressed &&
+      now - lastModeSwitchAt >= MODE_SWITCH_DEBOUNCE_MS) {
+    currentSpeedMode++;
+
+    if (currentSpeedMode >= SPEED_MODE_COUNT) {
+      currentSpeedMode = 0;
+    }
+
+    lastModeSwitchAt = now;
+    resetSmoothing();
+  }
+
+  modeSwitchComboWasPressed = comboPressed;
+}
+
+
+// ============================================================================
+// filterModeSwitchButtons()
+// EN: Suppresses shortcut buttons while a speed-mode chord is being detected.
+// FR: Bloque les boutons du raccourci pendant la détection de la combinaison.
+// ============================================================================
+
+uint32_t filterModeSwitchButtons(uint32_t buttonMask, bool comboPressed, bool &comboAccepted) {
+  comboAccepted = false;
+
+  if (!MODE_SWITCH_SUPPRESS_BUTTONS) {
+    comboAccepted = comboPressed;
+    return buttonMask;
+  }
+
+  uint32_t switchMask = getModeSwitchButtonMask();
+
+  if (switchMask == 0) {
+    return buttonMask;
+  }
+
+  unsigned long now = millis();
+  uint32_t nonSwitchButtons = buttonMask & ~switchMask;
+  uint32_t activeSwitchButtons = buttonMask & switchMask;
+
+  if (activeSwitchButtons == 0) {
+    modeSwitchChordActive = false;
+
+    if (!modeSwitchChordComboTriggered &&
+        !modeSwitchButtonsForwarded &&
+        modeSwitchPendingButtons != 0) {
+      uint32_t releasedButtons = modeSwitchPendingButtons;
+      resetModeSwitchChord();
+
+      return nonSwitchButtons | releasedButtons;
+    }
+
+    resetModeSwitchChord();
+    return nonSwitchButtons;
+  }
+
+  if (!modeSwitchChordActive) {
+    modeSwitchChordActive = true;
+    modeSwitchChordComboTriggered = false;
+    modeSwitchButtonsForwarded = false;
+    modeSwitchPendingButtons = activeSwitchButtons;
+    modeSwitchChordStartedAt = now;
+  } else {
+    modeSwitchPendingButtons |= activeSwitchButtons;
+  }
+
+  if (comboPressed && now - modeSwitchChordStartedAt <= MODE_SWITCH_CHORD_WINDOW_MS) {
+    modeSwitchChordComboTriggered = true;
+    comboAccepted = true;
+    return nonSwitchButtons;
+  }
+
+  if (modeSwitchChordComboTriggered) {
+    comboAccepted = true;
+    return nonSwitchButtons;
+  }
+
+  if (now - modeSwitchChordStartedAt < MODE_SWITCH_CHORD_WINDOW_MS) {
+    return nonSwitchButtons;
+  }
+
+  modeSwitchButtonsForwarded = true;
+  return buttonMask;
+}
+
+
+// ============================================================================
 // sendButtons()
 // EN:
 // Reads the physical buttons and sends them as HID button states.
@@ -375,16 +682,68 @@ void sendCommand(int16_t rx, int16_t ry, int16_t rz,
 // Lit les boutons physiques et les envoie comme états de boutons HID.
 // ============================================================================
 
-void sendButtons() {
+void sendButtons(uint32_t buttonMask) {
   uint8_t buttons[4] = { 0, 0, 0, 0 };
 
   for (int i = 0; i < BUTTON_COUNT; i++) {
-    if (digitalRead(buttonPins[i]) == LOW) {
+    if ((buttonMask & (1UL << i)) != 0) {
       buttons[i / 8] |= (1 << (i % 8));
     }
   }
 
   HID().SendReport(3, buttons, 4);
+}
+
+
+// ============================================================================
+// debugPrintState()
+// EN: Optional Serial Plotter friendly debug output.
+// FR: Sortie debug optionnelle compatible Serial Plotter.
+// ============================================================================
+
+void debugPrintState(const int* values,
+                     int16_t tx, int16_t ty, int16_t tz,
+                     int16_t rx, int16_t ry, int16_t rz,
+                     uint32_t buttonMask) {
+  if (!DEBUG_SERIAL) {
+    return;
+  }
+
+  static unsigned long lastDebugAt = 0;
+  unsigned long now = millis();
+
+  if (now - lastDebugAt < DEBUG_SERIAL_INTERVAL_MS) {
+    return;
+  }
+
+  lastDebugAt = now;
+
+  Serial.print("mode:");
+  Serial.print(currentSpeedMode);
+
+  Serial.print(" buttons:");
+  Serial.print(buttonMask);
+
+  for (int i = 0; i < 8; i++) {
+    Serial.print(" v");
+    Serial.print(i);
+    Serial.print(":");
+    Serial.print(values[i]);
+  }
+
+  Serial.print(" tx:");
+  Serial.print(tx);
+  Serial.print(" ty:");
+  Serial.print(ty);
+  Serial.print(" tz:");
+  Serial.print(tz);
+
+  Serial.print(" rx:");
+  Serial.print(rx);
+  Serial.print(" ry:");
+  Serial.print(ry);
+  Serial.print(" rz:");
+  Serial.println(rz);
 }
 
 
@@ -400,6 +759,10 @@ void sendButtons() {
 void setup() {
   static HIDSubDescriptor node(hidReportDescriptor, sizeof(hidReportDescriptor));
   HID().AppendDescriptor(&node);
+
+  if (DEBUG_SERIAL) {
+    Serial.begin(DEBUG_SERIAL_BAUD);
+  }
 
   for (int i = 0; i < BUTTON_COUNT; i++) {
     pinMode(buttonPins[i], INPUT_PULLUP);
@@ -441,6 +804,14 @@ void setup() {
 void loop() {
   int raw[8];
   int v[8];
+  uint32_t buttonMask = readButtonMask();
+  bool modeSwitchComboPressed = isModeSwitchComboPressed(buttonMask);
+  bool modeSwitchComboAccepted = false;
+  uint32_t hidButtonMask = filterModeSwitchButtons(buttonMask,
+                                                  modeSwitchComboPressed,
+                                                  modeSwitchComboAccepted);
+
+  updateSpeedMode(modeSwitchComboAccepted);
 
   // EN: Read raw joystick values.
   // FR: Lecture des valeurs brutes des joysticks.
@@ -572,6 +943,21 @@ void loop() {
   keepOnlyDominantAxis(transX, transY, transZ, rotX, rotY, rotZ);
 
   // --------------------------------------------------------------------------
+  // RESPONSE CURVE / COURBE DE RÉPONSE
+  // --------------------------------------------------------------------------
+
+  float speedScale = SPEED_MODE_SCALE[currentSpeedMode];
+  float responseCurve = SPEED_MODE_RESPONSE_CURVE[currentSpeedMode];
+
+  transX = applyResponseCurve(transX, 1024.0 * GAIN_TX, speedScale, responseCurve);
+  transY = applyResponseCurve(transY, 1024.0 * GAIN_TY, speedScale, responseCurve);
+  transZ = applyResponseCurve(transZ, 2048.0 * GAIN_TZ, speedScale, responseCurve);
+
+  rotX = applyResponseCurve(rotX, 1024.0 * GAIN_RX, speedScale, responseCurve);
+  rotY = applyResponseCurve(rotY, 1024.0 * GAIN_RY, speedScale, responseCurve);
+  rotZ = applyResponseCurve(rotZ, 1024.0 * GAIN_RZ, speedScale, responseCurve);
+
+  // --------------------------------------------------------------------------
   // OUTPUT DEADZONE / ZONE MORTE DE SORTIE
   // --------------------------------------------------------------------------
 
@@ -604,13 +990,15 @@ void loop() {
   // FINAL DEADZONE / ZONE MORTE FINALE
   // --------------------------------------------------------------------------
 
-  if (abs(smoothTX) < DEADZONE_OUTPUT) smoothTX = 0;
-  if (abs(smoothTY) < DEADZONE_OUTPUT) smoothTY = 0;
-  if (abs(smoothTZ) < DEADZONE_OUTPUT) smoothTZ = 0;
+  int16_t outputTX = smoothTX;
+  int16_t outputTY = smoothTY;
+  int16_t outputTZ = smoothTZ;
 
-  if (abs(smoothRX) < DEADZONE_OUTPUT) smoothRX = 0;
-  if (abs(smoothRY) < DEADZONE_OUTPUT) smoothRY = 0;
-  if (abs(smoothRZ) < DEADZONE_OUTPUT) smoothRZ = 0;
+  int16_t outputRX = smoothRX;
+  int16_t outputRY = smoothRY;
+  int16_t outputRZ = smoothRZ;
+
+  applyOutputDeadzone(outputTX, outputTY, outputTZ, outputRX, outputRY, outputRZ);
 
   // --------------------------------------------------------------------------
   // SEND HID REPORTS / ENVOI DES RAPPORTS HID
@@ -623,13 +1011,14 @@ void loop() {
   // L’ordre des axes est ajusté ici pour correspondre au comportement du driver
   // 3Dconnexion.
   sendCommand(
-    smoothRX,
-    smoothRZ,
-    smoothRY,
-    smoothTX,
-    smoothTZ,
-    smoothTY
+    outputRX,
+    outputRZ,
+    outputRY,
+    outputTX,
+    outputTZ,
+    outputTY
   );
 
-  sendButtons();
+  sendButtons(hidButtonMask);
+  debugPrintState(v, outputTX, outputTY, outputTZ, outputRX, outputRY, outputRZ, buttonMask);
 }
