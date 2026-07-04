@@ -23,6 +23,7 @@ This repository contains everything needed to build your own controller, includi
 * 6 Degrees of Freedom (6-DOF)
 * Hall Effect joystick technology
 * Arduino Pro Micro based firmware
+* Configurable multi-axis movement filtering
 * USB-C connectivity
 * Fully 3D printable design
 * Optional mechanical shortcut buttons
