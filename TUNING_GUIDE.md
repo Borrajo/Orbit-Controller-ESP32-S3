@@ -21,6 +21,7 @@ const float GAIN_RY = 1.8;
 const float GAIN_RZ = 2.0;
 
 const float ROTATION_PRIORITY = 0.65;
+const bool ENABLE_DOMINANT_AXIS_FILTER = false;
 ```
 
 After changing a value, upload the firmware again with Arduino IDE and test the controller in your 3D/CAD software.
@@ -323,7 +324,49 @@ const float ROTATION_PRIORITY = 0.85;
 
 ---
 
-## 8. Center calibration samples
+## 8. Dominant axis filter
+
+```cpp
+const bool ENABLE_DOMINANT_AXIS_FILTER = false;
+```
+
+This setting controls whether the firmware keeps only the strongest movement axis.
+
+When this value is `false`, several axes can be sent at the same time.
+This allows combined movements such as moving and rotating together.
+
+When this value is `true`, only the strongest axis is kept and the others are cancelled.
+This can make the controller easier to control, but it also prevents natural multi-axis movement.
+
+### Set this value to false if:
+
+- you want smooth multi-axis navigation;
+- diagonal or combined movements feel blocked;
+- moving and rotating at the same time feels difficult.
+
+### Set this value to true if:
+
+- unwanted diagonal movements are too frequent;
+- the controller feels difficult to control;
+- you prefer one movement direction at a time.
+
+### Example
+
+Allow several axes at the same time:
+
+```cpp
+const bool ENABLE_DOMINANT_AXIS_FILTER = false;
+```
+
+Keep only the strongest axis:
+
+```cpp
+const bool ENABLE_DOMINANT_AXIS_FILTER = true;
+```
+
+---
+
+## 9. Center calibration samples
 
 ```cpp
 const int CENTER_SAMPLES = 100;
@@ -359,7 +402,7 @@ const int CENTER_SAMPLES = 150;
 
 ---
 
-## 9. Common problems and suggested fixes
+## 10. Common problems and suggested fixes
 
 ### The controller moves by itself
 
@@ -417,6 +460,30 @@ const float GAIN_TY = 1.1;
 
 ---
 
+### Multi-axis movement feels blocked
+
+Try:
+
+```cpp
+const bool ENABLE_DOMINANT_AXIS_FILTER = false;
+```
+
+This allows several axes to be sent at the same time.
+
+---
+
+### Too many diagonal movements
+
+Try:
+
+```cpp
+const bool ENABLE_DOMINANT_AXIS_FILTER = true;
+```
+
+This keeps only the strongest movement axis and cancels the others.
+
+---
+
 ### Small movements are not detected
 
 Try:
@@ -450,7 +517,7 @@ const float GAIN_RZ = 1.6;
 
 ---
 
-## 10. Recommended tuning method
+## 11. Recommended tuning method
 
 Change only one setting at a time.
 
@@ -460,7 +527,8 @@ Recommended order:
 2. Adjust `DEADZONE_OUTPUT`.
 3. Adjust `SMOOTH_DIVISOR`.
 4. Adjust translation and rotation gains.
-5. Adjust `ROTATION_PRIORITY` only if rotation and translation are mixed.
+5. Adjust `ENABLE_DOMINANT_AXIS_FILTER` if multi-axis movement feels blocked or too loose.
+6. Adjust `ROTATION_PRIORITY` only if rotation and translation are mixed.
 
 After each change:
 
@@ -472,7 +540,7 @@ After each change:
 
 ---
 
-## 11. Safe default values
+## 12. Safe default values
 
 If tuning goes wrong, you can return to these default values:
 
@@ -491,11 +559,12 @@ const float GAIN_RY = 1.8;
 const float GAIN_RZ = 2.0;
 
 const float ROTATION_PRIORITY = 0.65;
+const bool ENABLE_DOMINANT_AXIS_FILTER = false;
 ```
 
 ---
 
-## 12. Final note
+## 13. Final note
 
 Small hardware differences, joystick tolerances, soldering, wire routing, and printed part tolerances can affect the final feel of the controller.
 
