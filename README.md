@@ -1,20 +1,52 @@
-![License](https://img.shields.io/github/license/HackMan3D/HackMan3D-Orbit-Controller)
+![License](https://img.shields.io/github/license/Borrajo/Orbit-Controller-ESP32-S3)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
-![Arduino](https://img.shields.io/badge/Arduino-Pro%20Micro-00979D?logo=arduino)
+![ESP32-S3](https://img.shields.io/badge/ESP32--S3-e?logo=espressif&labelColor=black&color=%23E7352C)
 ![Open Source](https://img.shields.io/badge/Open%20Source-Yes-brightgreen)
-[![GitHub stars](https://img.shields.io/github/stars/HackMan3D/HackMan3D-Orbit-Controller?style=social)](https://github.com/HackMan3D/HackMan3D-Orbit-Controller)
+[![GitHub stars](https://img.shields.io/github/stars/Borrajo/Orbit-Controller-ESP32-S3?style=social)](https://github.com/Borrajo/Orbit-Controller-ESP32-S3)
 
-# Hackman3D Orbit Controller
+# Orbit Controller SpaceMouse Pro - ESP32-S3 Edition
 
 <p align="center">
   <img src="images/43.jpg" alt="Hackman3D Orbit Controller" width="900">
 </p>
 
-An open-source DIY 6-DOF navigation controller built with an Arduino Pro Micro and Hall Effect joysticks.
+Welcome to the **ESP32-S3** version of the Orbit Controller. This project is an advanced DIY firmware to create your own 6-degrees-of-freedom (6-DOF) 3D mouse, designed to offer a native and smooth experience in CAD and 3D modeling software.
 
-This repository contains everything needed to build your own controller, including the firmware, Bill of Materials, wiring diagrams, board files, and documentation.
+This code builds upon the excellent mathematical logic of the original Hackman3D project (designed for the Arduino Pro Micro) but has been rewritten and optimized to leverage the superior hardware of the **ESP32-S3 via a wired USB connection**.
 
-> **This is my first large open-source hardware project after nearly four months of development. I've been using this controller daily for the past two months and now consider it ready to share with the maker community. Documentation and tutorials will continue to improve thanks to your feedback.**
+---
+
+## The ESP32-S3 Advantage
+
+Migrating to the ESP32-S3 wasn't just a board change; it was a leap in device precision:
+
+* **12-bit Resolution (The biggest upgrade):** While traditional Arduinos read joysticks with a 10-bit analog resolution (values from 0 to 1023), the ESP32-S3 uses a 12-bit ADC (values from 0 to 4095). This provides 4 times smoother movement. All sensitivity thresholds and deadzones from the original code were mathematically scaled to take advantage of this pinpoint accuracy.
+* **Native USB (TinyUSB):** The firmware uses the high-performance `Adafruit_TinyUSB` library to manage HID communication. A smart blocking logic (`while (!usb_hid.ready())`) was implemented to prevent dropping asynchronous USB packets, ensuring the computer receives translation and rotation data in perfect order.
+
+## Native 3DxWare Integration
+
+The main goal of this firmware is to achieve a professional "Plug & Play" experience. 
+
+The controller perfectly emulates the identity of an official 3Dconnexion **SpaceMouse Pro** or **SpaceMouse Compact**
+
+**Key recommendation:** It is strongly recommended to install the official **3DxWare** driver on your PC. By doing so, the driver will detect the Orbit Controller as original equipment, allowing you to:
+* Assign macros and native commands to physical buttons directly from the official graphical interface.
+* Change axis and sensitivity settings per application (Fusion 360, Blender, SolidWorks, etc.) without touching a single line of code.
+
+---
+
+## Main Code Features
+
+* **Dominant Axis Filter:** Configurable option (`ENABLE_DOMINANT_AXIS_FILTER`) to prioritize the strongest movement and discard the rest. Ideal for avoiding unwanted diagonal movements while modeling.
+* **Rotation Priority:** Anti-drift logic that detects if the main intention is to rotate, suppressing accidental ghost translations.
+* **Z-Push & Twist Detection:** Algorithm that analyzes the simultaneous movement of 3 or more Hall effect sensors/potentiometers to infer clean elevation (Z) or twist (Z Rotation) movements.
+* **Slicer Mode (Experimental):** A secondary mouse emulation and keyboard shortcut mode, designed to be used in slicer software that lacks native support for 3D joysticks.
+
+---
+
+## Wiring Guide
+
+To keep this document clean, all information regarding the pins used for the 4 joysticks (8 axes) and the exact button map to emulate the SpaceMouse Pro can be found in the [WIRING.md](Wiring/Wiring Guide - ESP32-S3.md) file.
 
 ---
 
@@ -22,7 +54,7 @@ This repository contains everything needed to build your own controller, includi
 
 * 6 Degrees of Freedom (6-DOF)
 * Hall Effect joystick technology
-* Arduino Pro Micro based firmware
+* ESP32-S3 based firmware
 * Adjustable speed profiles and response curve
 * Configurable multi-axis movement filtering
 * Optional slicer mouse emulation mode
@@ -47,9 +79,9 @@ This repository contains everything needed to build your own controller, includi
 
 ## Hardware Requirements
 
-* Arduino Pro Micro (ATmega32U4) USB-C 5v/16mhz
+* Espressif ESP32-S3 USB-C
 * 4× Hall Effect joystick modules (JH16 joystick hall effecct)
-* Optional mechanical keyboard switches (3 Mechanical Switchs)
+* Optional mechanical keyboard switches (many Mechanical Switchs)
 * Dupont wires female to female 15cm
 * Standard metric screws (M2 Countersunk and M3 Socket Head)
 * 4x M2x10 / 6x M2x6 / 4x M3x6 / 2x M3x8 / 4x M3x10 / 1x M3x12
@@ -148,20 +180,6 @@ Every contribution helps make the project better.
 
 ---
 
-## Roadmap
-
-- [x] Hardware design
-- [x] Firmware
-- [x] Complete documentation
-- [x] Windows support
-- [x] macOS support
-- [x] Linux support
-- [ ] Configuration utility
-- [ ] Additional button layouts
-- [ ] Community requested improvements
-
----
-
 ## License
 
 The firmware contained in this repository is released under the **GNU General Public License v3.0 (GPL-3.0)**.
@@ -169,51 +187,3 @@ The firmware contained in this repository is released under the **GNU General Pu
 3D printable files may be distributed under a separate license. Please refer to the STL repository for licensing information.
 
 ---
-
-## Contributing
-
-Bug reports, improvements, and pull requests are always welcome.
-
-If you build your own controller or improve the project, feel free to share it with the community!
-
----
-
-## Support
-
-If you have any questions, open an Issue or start a Discussion.
-
-Feedback is always appreciated and helps improve the project.
-
----
-
-## Disclaimer
-
-This is an independent open-source DIY project and is not affiliated with or endorsed by 3Dconnexion.
-
----
-
-## Credits
-
-Designed by **HackMan3D**
-
-Additional features, testing, and feedback by [Kitek](https://www.crealitycloud.com/user/7734397320).
-
-This project is released free of charge for the maker community.
-
-### Special Thanks
-
-Special thanks to **NavCore** for developing and maintaining the custom Arduino board package that enables native 3Dconnexion compatibility on the Arduino Pro Micro.
-
-Board package:
-
-https://github.com/NavCoree/3D-controller-Board-package
-
-Without this work, native 3Dconnexion support on the Arduino Pro Micro would not have been possible.
-
----
-
-If you build one, I'd genuinely love to see it.
-
-Don't hesitate to share your photos, remixes or improvements with the community!
-
-⭐ If you like this project, consider starring this repository.
